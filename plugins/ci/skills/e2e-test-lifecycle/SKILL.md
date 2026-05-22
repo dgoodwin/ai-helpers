@@ -18,6 +18,8 @@ Use this skill when you need to:
 - Audit suite membership for a component or SIG
 - Set a test's lifecycle to `Informing` during its stabilization period
 - Create or modify feature suites that compose into the new suite hierarchy
+- Set up or manage spot check suites/jobs for features requiring uncommon cluster configurations
+- Monitor spot check job pass status and flag overdue runs in Component Readiness
 
 ## Prerequisites
 
@@ -53,6 +55,7 @@ Tests graduate through a lifecycle of suites. Feature suites compose into these 
 | `openshift/active-serial` | Recent or actively developed features, must run serially | serial |
 | `openshift/stable-NN` | Graduated stable tests, parallel-safe, explicitly sharded (e.g., `stable-01`, `stable-02`) | parallel |
 | `openshift/stable-serial-NN` | Graduated stable tests, must run serially, explicitly sharded | serial |
+| `openshift/spot-check/<feature>` | Tests requiring uncommon cluster configs, owned by a component team | varies |
 
 ### Feature Suites
 
@@ -89,6 +92,54 @@ ext.AddGlobalSuite(e.Suite{
 })
 ```
 
+### Spot Check Suites
+
+Spot check suites are for features that require uncommon or specialized cluster configurations (e.g., etcd scaling, realtime nodes, external OIDC, CNV-dependent features). These features cannot be tested in the standard conformance or active/stable jobs because the cluster setup is too specialized.
+
+Each spot check suite has:
+
+- **A component owner**: A team responsible for the suite and its tests. The owner is accountable for keeping the job passing.
+- **Dedicated CI job(s)**: With the specific cluster configuration the feature requires.
+- **Reduced monitortest sensitivity**: Monitortests (origin tests that observe cluster behavior during test runs and optionally generate failure JUnit results) still run to gather debugging data, but their ability to generate failure JUnits is disabled in most spot check jobs. These specialized configurations often trigger monitortest alerts that are expected/acceptable for that configuration but would cause false failures.
+- **Component Readiness tracking**: A spot check job flags in Component Readiness if it has not passed within the last 30 days, ensuring coverage doesn't silently lapse.
+
+**Spot check lifecycle:**
+
+| Phase | Cadence | Purpose |
+|-------|---------|---------|
+| Development (pre-GA) | ~2x/day (minimum 14 runs/week) | Rapid signal during active feature development |
+| Graduated (1 release post-GA) | ~1x/month with retries | Ongoing verification that the feature still works |
+
+During development, the higher cadence ensures the minimum 14 runs in the past week needed for meaningful pass rate analysis. After the feature GAs and has been stable for one release, the job promotes to a graduated spot check: it runs roughly monthly but must pass (with a couple retries allowed for infrastructure flakes).
+
+**Existing origin suites that qualify as spot checks**: Several suites already defined in origin fit the spot check pattern, including `openshift/etcd/scaling`, `openshift/etcd/recovery`, `openshift/etcd/certrotation`, `openshift/nodes/realtime`, `openshift/nodes/cnv`, `openshift/auth/external-oidc`, `openshift/two-node`, and `openshift/disruptive-longrunning`. These could be managed under the spot check framework going forward.
+
+```go
+// Define a spot check suite for a feature requiring specialized config
+ext.AddSuite(e.Suite{
+    Name:    "mycomponent/feature-special-config",
+    Qualifiers: []string{
+        `labels.exists(l, l=="SPOT-CHECK-FEATURE-X")`,
+    },
+})
+
+// Label tests for this spot check
+specs.Select(et.NameContains("[sig-etcd] vertical scaling")).AddLabel("SPOT-CHECK-ETCD-SCALING")
+```
+
+**Monitortest configuration for spot check jobs**: In the CI job configuration, disable monitortest failure JUnit generation while keeping data collection:
+
+```yaml
+env:
+  TEST_SUITE: mycomponent/feature-special-config
+  MONITOR_JUNIT_DISABLED: "true"  # collect monitortest data but do not generate failure JUnits
+```
+
+<!-- TODO: Confirm the exact mechanism for disabling monitortest failure JUnit
+generation. The env var above is illustrative; the actual mechanism may differ
+(e.g., a flag on openshift-tests run, a suite-level setting, or a CI step
+configuration). Investigate how existing disruptive suites handle this. -->
+
 ### Explicit Sharding
 
 We intentionally do not rely on the pre-existing auto-sharding mechanism. Auto-sharding does not work in constrained environments like vSphere where concurrent batches of jobs cannot be spun up. Instead, we use explicit shards (`stable-01`, `stable-02`, etc.) that can be scheduled at different times.
@@ -124,7 +175,11 @@ Once the test achieves >= 99% pass rate over a sustained period, remove the `Inf
 
 After the feature GAs (typically one release after GA), and the test has a sustained very high pass rate (>= 99.5%), promote it to a `stable-NN` or `stable-serial-NN` shard.
 
-### 4. Conformance Candidates
+### 4. Spot Check (Specialized Configurations)
+
+Tests requiring uncommon cluster configurations go into a spot check suite rather than the active/stable hierarchy. During development, the spot check job runs ~2x/day for adequate signal. One release after GA, it graduates to ~1x/month with retries, and Component Readiness flags it if no pass is recorded within 30 days.
+
+### 5. Conformance Candidates
 
 Only tests verifying the most fundamental cluster smoke-test functionality belong in `openshift/conformance`. Most tests should NOT be in conformance.
 
@@ -322,7 +377,41 @@ ext.AddSuite(e.Suite{
 })
 ```
 
-### Example 4: Rebalance Shards
+### Example 4: Set Up a Spot Check Suite
+
+For a feature requiring etcd vertical scaling (uncommon cluster config):
+
+```go
+// Define the spot check suite
+ext.AddSuite(e.Suite{
+    Name: "openshift/etcd/scaling",
+    Qualifiers: []string{
+        `labels.exists(l, l=="SPOT-CHECK-ETCD-SCALING")`,
+    },
+})
+
+// Label the tests
+specs.Select(et.NameContains("[sig-etcd] vertical scaling")).AddLabel("SPOT-CHECK-ETCD-SCALING")
+```
+
+CI job config (development phase, ~2x/day):
+```yaml
+- as: e2e-aws-etcd-scaling
+  cron: "0 6,18 * * *"
+  steps:
+    env:
+      TEST_SUITE: openshift/etcd/scaling
+      MONITOR_JUNIT_DISABLED: "true"
+```
+
+After GA + 1 release, reduce to monthly:
+```yaml
+  cron: "0 6 1 * *"  # 1st of each month
+```
+
+Component Readiness will flag if no pass is recorded within 30 days.
+
+### Example 5: Rebalance Shards
 
 ```
 User: The stable-01 job is running 45 minutes but stable-02 only runs 25 minutes. Rebalance them.
