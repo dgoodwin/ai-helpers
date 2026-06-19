@@ -1,0 +1,19 @@
+test_name: "[Monitor:legacy-test-framework-invariants-pathological][sig-arch] events should not repeat pathologically for ns/openshift-multus"
+component: "Networking / multus"
+release: "5.0"
+expected_pattern: recent_regression
+expected_triage_status: untriaged
+expected_triage_scenario: C
+has_related_regressions: true
+is_mass_failure: true
+is_install_regression: false
+
+notes: >
+  Fresh regression opened 2026-06-19 with 4 job runs all on the same
+  periodic-ci-openshift-multiarch upgrade job (arm64/aws/ovn/ha/micro).
+  Each run has 14-16 total test failures, suggesting this test may be
+  collateral from a broader issue rather than a targeted multus regression.
+  No triages exist. Related triages API returns a similarly named test
+  regression from 4.22. The skill should identify the mass failure pattern
+  from job_runs test_failures counts, classify this as a recent regression,
+  and offer to file a new bug (scenario C) since no existing triage covers it.

@@ -8,6 +8,7 @@ execution:
   timeout: 3600
   max_budget_usd: 15.0
   env:
+    EVAL_SNAPSHOT_DIR: "{case_dir}/snapshot"
     JIRA_USERNAME: $JIRA_USERNAME
     JIRA_API_TOKEN: $JIRA_API_TOKEN
     JIRA_URL: $JIRA_URL
@@ -35,7 +36,7 @@ mlflow:
   experiment: ci-analyze-regression-eval
 
 dataset:
-  path: plugins/ci/evals/cases/analyze-regression
+  path: cases/analyze-regression
   schema: |
     Each case directory contains:
     - input.yaml: YAML file with fields:

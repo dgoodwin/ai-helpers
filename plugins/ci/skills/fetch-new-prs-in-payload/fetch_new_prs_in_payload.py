@@ -7,12 +7,18 @@ falling back to the release controller API when Sippy has not yet ingested the p
 
 import argparse
 import json
+import os
 import re
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Dict, List, Optional
+
+_lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
+if _lib not in sys.path:
+    sys.path.insert(0, _lib)
+from lib.snapshot_http import snapshot_urlopen
 
 SIPPY_API_BASE = "https://sippy.dptools.openshift.org/api"
 RELEASE_CONTROLLER_BASE = "https://amd64.ocp.releases.ci.openshift.org/api/v1"
@@ -21,7 +27,7 @@ RELEASE_CONTROLLER_BASE = "https://amd64.ocp.releases.ci.openshift.org/api/v1"
 def _http_get_json(url: str, timeout: int = 30) -> dict:
     """Fetch JSON from a URL. Raises on HTTP or connection errors."""
     req = urllib.request.Request(url, headers={"Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with snapshot_urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 

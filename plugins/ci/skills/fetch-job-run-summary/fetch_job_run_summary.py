@@ -5,6 +5,7 @@ Returns job metadata and all failed tests (excluding flakes),
 with error messages and pattern analysis for AI consumption.
 """
 
+import os as _os
 import sys
 import json
 import re
@@ -12,6 +13,11 @@ import urllib.request
 import urllib.error
 from collections import defaultdict
 from typing import Dict, Any, List, Tuple
+
+_lib = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..')
+if _lib not in sys.path:
+    sys.path.insert(0, _lib)
+from lib.snapshot_http import snapshot_urlopen
 
 
 class JobRunSummaryFetcher:
@@ -28,7 +34,7 @@ class JobRunSummaryFetcher:
         req.add_header("Accept", "application/json")
 
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with snapshot_urlopen(req, timeout=30) as resp:
                 return json.loads(resp.read().decode())
         except urllib.error.HTTPError as e:
             return {"error": f"HTTP {e.code}: {e.reason}", "url": url}

@@ -1,0 +1,22 @@
+{
+  "336f0876faf8": {
+    "status_code": 200,
+    "timestamp": "2026-06-19T16:33:41.265292+00:00",
+    "url": "https://sippy.dptools.openshift.org/api/component_readiness/regressions/42520/matches"
+  },
+  "45f1a85b964a": {
+    "status_code": 200,
+    "timestamp": "2026-06-19T16:33:39.664040+00:00",
+    "url": "https://sippy.dptools.openshift.org/api/component_readiness/regressions/42520"
+  },
+  "e723879be45e": {
+    "status_code": 200,
+    "timestamp": "2026-06-19T16:33:42.918140+00:00",
+    "url": "https://sippy.dptools.openshift.org/api/component_readiness/regressions?release=5.0"
+  },
+  "ea2940fc6cbd": {
+    "status_code": 200,
+    "timestamp": "2026-06-19T16:33:40.131827+00:00",
+    "url": "https://sippy.dptools.openshift.org/api/tests/v2?release=5.0&filter=%7B%22items%22%3A+%5B%7B%22columnField%22%3A+%22name%22%2C+%22operatorValue%22%3A+%22equals%22%2C+%22value%22%3A+%22%5BMonitor%3Alegacy-test-framework-invariants-pathological%5D%5Bsig-arch%5D+events+should+not+repeat+pathologically+for+ns%2Fopenshift-multus%22%7D%5D%7D&collapse=false"
+  }
+}

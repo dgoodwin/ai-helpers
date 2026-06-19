@@ -14,6 +14,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+_lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
+if _lib not in sys.path:
+    sys.path.insert(0, _lib)
+from lib.snapshot_http import snapshot_urlopen
+
 SIPPY_API_BASE = "https://sippy.dptools.openshift.org/api"
 SIPPY_RELEASES_URL = "https://sippy.dptools.openshift.org/api/releases"
 
@@ -21,7 +26,7 @@ SIPPY_RELEASES_URL = "https://sippy.dptools.openshift.org/api/releases"
 def get_latest_release() -> str:
     """Fetch the latest OCP release version from the Sippy releases API."""
     try:
-        with urllib.request.urlopen(SIPPY_RELEASES_URL, timeout=10) as resp:
+        with snapshot_urlopen(SIPPY_RELEASES_URL, timeout=10) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         print(f"Error: Could not fetch releases from Sippy API: {e}", file=sys.stderr)
@@ -58,7 +63,7 @@ def lookup_test(test_name: str, release: str, collapse: bool = True) -> list:
 
     try:
         req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with snapshot_urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         print(f"Error: HTTP {e.code} from Sippy API: {e.reason}", file=sys.stderr)

@@ -5,6 +5,7 @@ Returns test run data including outputs for AI-based interpretation and similari
 Can optionally include successful runs in addition to failures.
 """
 
+import os as _os
 import sys
 import json
 import urllib.request
@@ -12,6 +13,11 @@ import urllib.error
 import urllib.parse
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
+
+_lib = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..')
+if _lib not in sys.path:
+    sys.path.insert(0, _lib)
+from lib.snapshot_http import snapshot_urlopen
 
 
 class TestRunsFetcher:
@@ -94,7 +100,7 @@ class TestRunsFetcher:
 
         """
         try:
-            with urllib.request.urlopen(self.api_url, timeout=30) as response:
+            with snapshot_urlopen(self.api_url, timeout=30) as response:
                 data = json.loads(response.read().decode('utf-8'))
 
                 # Check for API error in response

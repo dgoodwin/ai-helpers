@@ -4,12 +4,18 @@ Fetch detailed regression information from the Sippy Component Readiness API.
 Retrieves test name, affected variants, release information, triage status, and metadata.
 """
 
+import os as _os
 import sys
 import json
 import urllib.request
 import urllib.error
 from typing import Dict, List, Optional, Any
 from datetime import datetime
+
+_lib = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..')
+if _lib not in sys.path:
+    sys.path.insert(0, _lib)
+from lib.snapshot_http import snapshot_urlopen
 
 
 class RegressionFetcher:
@@ -39,7 +45,7 @@ class RegressionFetcher:
             urllib.error.URLError: If network connection fails
         """
         try:
-            with urllib.request.urlopen(self.api_url) as response:
+            with snapshot_urlopen(self.api_url) as response:
                 data = json.loads(response.read().decode('utf-8'))
 
                 # Check for API error in response
@@ -201,7 +207,7 @@ class RegressionFetcher:
             ValueError: If fetch fails or API error occurs
         """
         try:
-            with urllib.request.urlopen(test_details_url) as response:
+            with snapshot_urlopen(test_details_url) as response:
                 data = json.loads(response.read().decode('utf-8'))
 
                 # Check for API error in response

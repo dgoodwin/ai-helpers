@@ -15,6 +15,11 @@ import urllib.error
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 
+_lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
+if _lib not in sys.path:
+    sys.path.insert(0, _lib)
+from lib.snapshot_http import snapshot_urlopen
+
 
 def _adf_to_text(node: Any) -> str:
     """Convert an Atlassian Document Format (ADF) node to plain text.
@@ -143,7 +148,7 @@ class JiraIssueFetcher:
         req.add_header("Accept", "application/json")
 
         try:
-            with urllib.request.urlopen(req, timeout=30) as response:
+            with snapshot_urlopen(req, timeout=30) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             if e.code == 401:

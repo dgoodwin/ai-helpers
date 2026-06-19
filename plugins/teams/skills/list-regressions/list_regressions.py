@@ -27,6 +27,11 @@ import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 
+_lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'ci')
+if _lib not in sys.path:
+    sys.path.insert(0, _lib)
+from lib.snapshot_http import snapshot_urlopen
+
 
 def get_team_components(team_name: str) -> list:
     """
@@ -167,7 +172,7 @@ def fetch_regressions(release: str) -> dict:
     print(f"Fetching regressions from: {url}", file=sys.stderr)
     
     try:
-        with urllib.request.urlopen(url, timeout=30) as response:
+        with snapshot_urlopen(url, timeout=30) as response:
             if response.status == 200:
                 data = json.loads(response.read().decode('utf-8'))
                 return data

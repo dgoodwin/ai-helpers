@@ -16,10 +16,16 @@ Examples:
 
 import argparse
 import json
+import os
 import sys
 import urllib.request
 import urllib.error
 from typing import Optional
+
+_lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
+if _lib not in sys.path:
+    sys.path.insert(0, _lib)
+from lib.snapshot_http import snapshot_urlopen
 
 SIPPY_BASE_URL = "https://sippy.dptools.openshift.org"
 
@@ -39,7 +45,7 @@ def fetch_related_triages(regression_id: int) -> dict:
     req.add_header("Accept", "application/json")
 
     try:
-        with urllib.request.urlopen(req, timeout=60) as response:
+        with snapshot_urlopen(req, timeout=60) as response:
             data = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         error_body = e.read().decode("utf-8", errors="replace")
