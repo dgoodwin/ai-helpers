@@ -1,30 +1,21 @@
 ---
+name: analyze-regression
 description: Analyze details about a Component Readiness regression and suggest next steps
 argument-hint: <regression id>
 ---
 
-## Name
+# Analyze Regression
 
-ci:analyze-regression
+This skill analyzes details for a specific Component Readiness regression and suggests next steps for investigation. It performs a full analysis regardless of whether the regression has been triaged. For triaged regressions, it also fetches the linked JIRA issue to analyze whether someone is actively working on the fix or if the issue needs attention.
 
-## Synopsis
+## When to Use This Skill
 
-```
-/ci:analyze-regression <regression id>
-```
+Use this skill when you need to:
 
-## Description
-
-The `ci:analyze-regression` command analyzes details for a specific Component Readiness regression and suggests next steps for investigation.
-
-The command performs a full analysis regardless of whether the regression has been triaged. For triaged regressions, it also fetches the linked JIRA issue to analyze whether someone is actively working on the fix or if the issue needs attention.
-
-This command is useful for:
-
-- Understanding regression patterns and failure modes
-- Checking if a triaged regression is being actively worked on or needs attention
-- Identifying related regressions that might be caused by the same issue
-- Getting pointers on where to investigate next
+- Understand regression patterns and failure modes
+- Check if a triaged regression is being actively worked on or needs attention
+- Identify related regressions that might be caused by the same issue
+- Get pointers on where to investigate next
 
 ## Implementation
 
@@ -1093,7 +1084,7 @@ This works because `oc` reads from `~/.kube/config` which is bind-mounted from t
 
 ## Return Value
 
-The command outputs a **Comprehensive Regression Analysis Report** for all regressions, with additional JIRA progress analysis for triaged regressions:
+The skill outputs a **Comprehensive Regression Analysis Report** for all regressions, with additional JIRA progress analysis for triaged regressions:
 
 #### Regression Summary
 
@@ -1256,7 +1247,7 @@ Generated using the `fetch-prowjob-json` and `fetch-new-prs-in-payload` skills:
 
 #### Triage Offering
 
-After the report, the command offers to triage based on findings:
+After the report, the skill offers to triage based on findings:
 
 - **Related triage found**: Offers to add this regression (and untriaged related regressions) to the existing triage record
 - **Related JIRA bug found**: Offers to create a new triage linking this regression (and untriaged related regressions) to the bug
@@ -1357,7 +1348,5 @@ Uses the `triage-regression` skill with authentication via the `oc-auth` skill (
 - Related Skill: `set-release-blocker` - Sets Release Blocker field on JIRA bugs (`plugins/ci/skills/set-release-blocker/SKILL.md`)
 - Related Skill: `oc-auth` - Authentication tokens for sippy-auth (`plugins/ci/skills/oc-auth/SKILL.md`)
 - Related Skill: `prow-job-analyze-install-failure` - Deep per-run install failure analysis via GCS artifacts (`plugins/ci/skills/prow-job-analyze-install-failure/SKILL.md`)
-- Related Command: `/component-health:list-regressions` (for bulk regression data)
-- Related Command: `/component-health:analyze-regressions` (for overall component health)
 - Component Readiness: https://sippy-auth.dptools.openshift.org/sippy-ng/component_readiness/main
 - TRT Documentation: https://docs.ci.openshift.org/docs/release-oversight/troubleshooting-failures/
