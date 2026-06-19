@@ -1,0 +1,266 @@
+name: ci-analyze-regression-eval
+description: Evaluate the analyze-regression skill's ability to analyze Component Readiness regressions, classify failure patterns, correlate with suspect PRs, and produce actionable reports with triage recommendations
+skill: ci:analyze-regression
+
+execution:
+  mode: case
+  arguments: "{regression_id}"
+  timeout: 3600
+  max_budget_usd: 15.0
+  env:
+    JIRA_USERNAME: $JIRA_USERNAME
+    JIRA_API_TOKEN: $JIRA_API_TOKEN
+    JIRA_URL: $JIRA_URL
+
+runner:
+  type: claude-code
+  plugin_dirs:
+    - plugins/ci
+    - plugins/teams
+
+models:
+  skill: claude-opus-4-6
+  judge: claude-opus-4-6
+  hook: claude-sonnet-4-6
+
+permissions:
+  allow:
+    - "Skill"
+    - "Bash"
+    - "Read"
+    - "WebFetch"
+  deny: []
+
+mlflow:
+  experiment: ci-analyze-regression-eval
+
+dataset:
+  path: plugins/ci/evals/cases/analyze-regression
+  schema: |
+    Each case directory contains:
+    - input.yaml: YAML file with fields:
+      - 'regression_id' ([EXTERNAL: Sippy/Component Readiness] — must be a real
+        regression ID from Component Readiness, e.g., 34446)
+    - annotations.yaml: Expected outcomes and metadata for scoring:
+      - 'test_name': full test name including tags (e.g., '[sig-api-machinery] ...')
+      - 'component': expected component attribution
+      - 'expected_pattern': primary failure pattern classification
+        (permafail|resolved|flaky|recent_regression)
+      - 'expected_triage_status': whether regression is triaged or untriaged
+      - 'expected_triage_scenario': which triage scenario should apply (A|B|C|D)
+      - 'has_related_regressions': boolean — whether related regressions exist
+      - 'is_mass_failure': boolean — whether regression is collateral from mass failures
+      - 'is_install_regression': boolean — whether test is "install should succeed"
+      - 'notes': free text context about the case and expected analysis
+    - answers.yaml (optional): guidance for the AskUserQuestion hook when the
+      skill offers to triage. Contains expected answers for triage confirmation
+      questions (e.g., whether to add to existing triage, create new bug, etc.)
+
+inputs:
+  tools:
+    - match: Questions asked to the user via AskUserQuestion (triage offering at step 14)
+      prompt: |
+        Answer based on the test case context in input.yaml and answers.yaml.
+        The skill will ask whether to triage the regression — whether to add it
+        to an existing triage, create a new triage, or file a new JIRA bug.
+        Use answers.yaml guidance if available. Default: decline triage actions
+        to avoid modifying external state during evaluation.
+    - match: |
+        Any interaction with JIRA — whether via Bash scripts calling the JIRA API
+        (fetch-jira-issue, add-jira-triage-link, set-release-blocker) or any
+        write operations to JIRA.
+      prompt: |
+        Allow read-only JIRA operations (fetching issue details for analysis).
+        Block write operations (creating bugs, updating descriptions, setting
+        release blockers) unless the test case explicitly expects them.
+    - match: |
+        Any interaction with the DPCR cluster via oc commands or triage-regression
+        script calls to the sippy-auth API.
+      prompt: |
+        Block triage write operations to sippy-auth API during evaluation.
+        The skill should complete its analysis and report without actually
+        creating or updating triage records.
+
+outputs:
+  - path: "output"
+    schema: |
+      The skill produces conversation-only output (no file artifacts). All analysis
+      is delivered as structured text in the conversation. Judges should use
+      {{ conversation }} to access the skill's output.
+
+      The conversation output contains a Comprehensive Regression Analysis Report
+      with these sections:
+      1. Regression Summary — test name, component, release, status, variants,
+         analysis status, triage status, test details URL
+      2. Global Test Health — overall pass rate, per-variant breakdown, open bugs, trend
+      3. Failure Pattern Analysis — jobs ranked by failures, pass sequences,
+         pattern classification (permafail/resolved/flaky/recent regression),
+         priority levels
+      4. Failure Output Analysis — consistency classification, common error messages,
+         key debugging info
+      4a. Job Run Context — isolation assessment (isolated/co-failures/mass failures),
+          dominant error patterns
+      4b. Install Failure Analysis (only for "install should succeed" tests)
+      5. Regression Start Analysis (only if determinable) — first failing run,
+         approximate start date
+      6. Suspect PRs in Payload (only if start determined) — payload tag,
+         investigated PRs with relevance classification
+      7. Related Regressions and Existing Triages — related tests, existing triages,
+         triage recommendations
+      8. Bug Filing / Next Steps — bug template or JIRA progress analysis
+      9. Triage Offering — AskUserQuestion with triage scenario (A/B/C/D)
+
+traces:
+  stdout: true
+  stderr: true
+  events: true
+  metrics: true
+
+judges:
+  - name: budget_check
+    builtin: cost_budget
+    arguments:
+      max_cost_usd: 15.0
+
+  - name: report_sections_present
+    description: |
+      Verify the conversation output contains the required report sections:
+      regression summary, failure pattern analysis, failure output analysis,
+      and next steps/triage offering.
+    check: |
+      text = outputs.get("conversation", "").lower()
+      if not text:
+          return (False, "No conversation output")
+      sections = {
+          "regression summary": any(s in text for s in ["regression summary", "test name", "component"]),
+          "failure pattern": any(s in text for s in ["failure pattern", "pass sequence", "permafail", "flaky"]),
+          "failure output": any(s in text for s in ["failure output", "consistency", "error message"]),
+          "next steps": any(s in text for s in ["next steps", "bug filing", "triage", "recommend"]),
+      }
+      found = [k for k, v in sections.items() if v]
+      missing = [k for k, v in sections.items() if not v]
+      if missing:
+          return (False, f"Missing sections: {', '.join(missing)}. Found: {', '.join(found)}")
+      return (True, f"All {len(sections)} required sections found")
+
+  - name: test_details_url_converted
+    description: |
+      Verify that Sippy test details URLs are converted from API format to UI format.
+      The API URL (sippy.dptools.openshift.org/api/component_readiness/test_details)
+      must be converted to UI URL (sippy-auth.dptools.openshift.org/sippy-ng/component_readiness/test_details).
+    check: |
+      text = outputs.get("conversation", "")
+      if not text:
+          return (False, "No conversation output")
+      api_url = "sippy.dptools.openshift.org/api/component_readiness/test_details"
+      ui_url = "sippy-auth.dptools.openshift.org/sippy-ng/component_readiness/test_details"
+      has_api = api_url in text
+      has_ui = ui_url in text
+      if has_api and not has_ui:
+          return (False, "API URL found but not converted to UI URL")
+      if has_ui:
+          return (True, "Test details URL correctly converted to UI format")
+      return (True, "No test details URL found (may not be applicable)")
+
+  - name: pass_sequence_direction
+    description: |
+      Verify that pass sequence analysis correctly identifies LEFT=newest, RIGHT=oldest.
+      The report should not confuse the reading direction.
+    check: |
+      text = outputs.get("conversation", "").lower()
+      if not text:
+          return (False, "No conversation output")
+      has_sequence = "pass sequence" in text or "pass_sequence" in text or any(c in text for c in ["fffff", "sssss", "sfsfs"])
+      if not has_sequence:
+          return (False, "No pass sequence analysis found in output")
+      wrong_direction = "right = newest" in text or "right=newest" in text or "rightmost = most recent" in text
+      if wrong_direction:
+          return (False, "Pass sequence direction is WRONG — says right=newest but should be left=newest")
+      return (True, "Pass sequence analysis present (direction appears correct)")
+
+  - name: pattern_classification_quality
+    description: |
+      LLM judge to assess whether failure patterns are correctly classified
+      (permafail, resolved, flaky, recent regression) based on the pass sequences
+      shown in the report.
+    prompt: |
+      You are evaluating the failure pattern analysis in a Component Readiness
+      regression report. The skill analyzes pass sequences (strings of S and F
+      characters) where LEFT = most recent runs and RIGHT = oldest runs.
+
+      Pattern definitions:
+      - Permafail: F's at the LEFT (newest runs failing consistently)
+      - Resolved: S's at the LEFT (recent runs passing), F's at the RIGHT
+      - Flaky: Mixed S and F throughout, no clear block
+      - Recent Regression: F's at the LEFT, S's at the RIGHT
+
+      Review the skill's conversation output:
+
+      {{ conversation }}
+
+      Expected outcomes:
+
+      {{ annotations }}
+
+      Evaluate pattern classification accuracy on a 1-5 scale:
+
+      Score 1: No pattern classification present, or consistently wrong classifications
+      Score 2: Some patterns classified but with major errors (e.g., permafail called resolved)
+      Score 3: Most patterns correctly classified; minor misclassifications on edge cases
+      Score 4: All patterns correctly classified with clear reasoning; priority levels appropriate
+      Score 5: Excellent classification with nuanced analysis — distinguishes edge cases,
+               explains reasoning for each classification, priority levels well-justified
+
+  - name: analysis_completeness
+    description: |
+      LLM judge to assess overall analysis quality — whether the report provides
+      actionable insights for debugging the regression, with appropriate depth
+      across all sections.
+    prompt: |
+      You are evaluating the completeness and quality of a Component Readiness
+      regression analysis report. The skill should analyze a regression ID and
+      produce a comprehensive report covering failure patterns, error consistency,
+      job run context, related regressions, and next steps.
+
+      Review the skill's conversation output:
+
+      {{ conversation }}
+
+      Expected outcomes for this test case:
+
+      {{ annotations }}
+
+      Evaluate on a 1-5 scale:
+
+      Score 1: Analysis is shallow — just restates regression metadata without
+               investigation. Missing most sections. No actionable recommendations.
+      Score 2: Partial analysis — covers 2-3 sections but skips important ones
+               (e.g., no failure output analysis, no related regressions check).
+               Recommendations are generic.
+      Score 3: Adequate analysis — covers all major sections with reasonable depth.
+               Error messages analyzed, related regressions checked, next steps provided.
+               May miss nuances (e.g., not distinguishing isolated vs mass failures).
+      Score 4: Thorough analysis — all sections covered with good depth. Specific
+               error messages cited, pattern classifications well-reasoned, related
+               regressions identified with context, suspect PRs analyzed if applicable.
+               Clear, actionable recommendations.
+      Score 5: Exceptional analysis — all sections covered comprehensively. Error
+               consistency analysis with specific percentages, job run context
+               properly assessed (isolated vs co-failures vs mass), regression start
+               date determined with first failing run URL, suspect PRs investigated
+               with relevance classification. Report is immediately actionable for
+               a release engineer.
+
+thresholds:
+  budget_check:
+    min_pass_rate: 1.0
+  report_sections_present:
+    min_pass_rate: 1.0
+  test_details_url_converted:
+    min_pass_rate: 1.0
+  pass_sequence_direction:
+    min_pass_rate: 1.0
+  pattern_classification_quality:
+    min_mean: 3.5
+  analysis_completeness:
+    min_mean: 3.5
