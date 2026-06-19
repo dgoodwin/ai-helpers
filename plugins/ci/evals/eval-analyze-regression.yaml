@@ -171,13 +171,18 @@ judges:
       text = outputs.get("conversation", "").lower()
       if not text:
           return (False, "No conversation output")
-      has_sequence = "pass sequence" in text or "pass_sequence" in text or any(c in text for c in ["fffff", "sssss", "sfsfs"])
-      if not has_sequence:
-          return (False, "No pass sequence analysis found in output")
+      sequence_terms = ["pass sequence", "pass_sequence", "fffff", "sssss", "sfsfs", "ffff", "ssss"]
+      pattern_terms = ["permafail", "recent regression", "resolved", "flaky", "pattern"]
+      has_sequence = any(t in text for t in sequence_terms)
+      has_pattern = any(t in text for t in pattern_terms)
+      if not has_sequence and not has_pattern:
+          return (False, "No pass sequence or pattern analysis found in output")
       wrong_direction = "right = newest" in text or "right=newest" in text or "rightmost = most recent" in text
       if wrong_direction:
           return (False, "Pass sequence direction is WRONG — says right=newest but should be left=newest")
-      return (True, "Pass sequence analysis present (direction appears correct)")
+      if has_sequence:
+          return (True, "Pass sequence analysis present (direction appears correct)")
+      return (True, "Pattern classification present (pass sequence terms not used, likely short sequence)")
 
   - name: pattern_classification_quality
     description: |

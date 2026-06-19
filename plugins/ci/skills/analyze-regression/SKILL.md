@@ -247,6 +247,14 @@ This works because `oc` reads from `~/.kube/config` which is bind-mounted from t
      - Interpretation: Test was passing historically but has recently started failing
      - Action: High priority - recent regression, investigate recent code changes
 
+     **Short Sequence Disambiguation (≤10 runs)**
+     - When the pass_sequence is short and contains all or mostly F's, Patterns 1 and 4 are ambiguous — there aren't enough historical runs to distinguish a long-standing permafail from a recent regression.
+     - In this case, use **contextual signals** to disambiguate:
+       1. **Regression creation date**: If the regression was opened very recently (within the last few days), this strongly favors `recent_regression` over `permafail`.
+       2. **Overall test pass rate**: If the test report shows a high historical pass rate (e.g., >80%), the test was clearly passing before these failures — classify as `recent_regression`.
+       3. **Number of runs in the sequence**: A sequence like `FFFF` with only 4 runs simply means "4 recent runs failed" — it does NOT mean the test has always been failing. Do not call this permafail unless you have evidence of long-standing failure.
+     - Rule of thumb: if the regression is new (opened in the last week) AND the test has a high historical pass rate, classify as `recent_regression` even if the short sequence is all F's.
+
    - **Generate Pattern Summary**: Create a summary for each job:
      - Job name
      - Total failed runs
