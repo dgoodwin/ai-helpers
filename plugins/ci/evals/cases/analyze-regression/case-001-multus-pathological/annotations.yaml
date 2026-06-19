@@ -17,3 +17,7 @@ notes: >
   regression from 4.22. The skill should identify the mass failure pattern
   from job_runs test_failures counts, classify this as a recent regression,
   and offer to file a new bug (scenario C) since no existing triage covers it.
+  The skill should identify additional regressions for this test name, as well as additional regressions for
+  "[Monitor:legacy-test-framework-invariants-pathological][sig-arch] events should not repeat pathologically for ns/openshift-network-diagnostics".
+  The two problems appear to be linked and there should be three regressions total for each of the two test IDs. 
+  The skill should identify that the problems appear to have begun on June 18th. 
