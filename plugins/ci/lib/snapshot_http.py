@@ -24,7 +24,10 @@ REDACTED_HEADERS = frozenset({"authorization", "cookie", "set-cookie"})
 
 
 def _snapshot_dir():
-    return os.environ.get(SNAPSHOT_DIR_ENV)
+    d = os.environ.get(SNAPSHOT_DIR_ENV)
+    if d is not None:
+        return os.path.abspath(d)
+    return None
 
 
 def _is_record_mode():

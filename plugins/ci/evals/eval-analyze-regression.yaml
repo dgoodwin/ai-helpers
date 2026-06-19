@@ -8,7 +8,7 @@ execution:
   timeout: 3600
   max_budget_usd: 15.0
   env:
-    EVAL_SNAPSHOT_DIR: "{case_dir}/snapshot"
+    EVAL_SNAPSHOT_DIR: "./snapshot"
     JIRA_USERNAME: $JIRA_USERNAME
     JIRA_API_TOKEN: $JIRA_API_TOKEN
     JIRA_URL: $JIRA_URL
@@ -37,6 +37,9 @@ mlflow:
 
 dataset:
   path: cases/analyze-regression
+  workspace:
+    files:
+      - snapshot
   schema: |
     Each case directory contains:
     - input.yaml: YAML file with fields:
